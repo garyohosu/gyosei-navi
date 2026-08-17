@@ -1,0 +1,17 @@
+### 2026-08-17T21:48:32+09:00
+### uv run apcli fetch procedures-survey-r6
+C:\project\administrative-procedures-mcp\src\admin_procedures\prepare_dataset.py:151: FutureWarning: from_arrow(<ArrowStreamExportable>) will return a Series instead of a DataFrame in 2.0. To avoid this warning, pass the ArrowStreamExportable to either `pl.DataFrame` or `pl.Series` instead based on your desired output type.
+  df = pl.read_excel(path, has_header=False)
+[fetch] Dataset: procedures-survey-r6
+  Page:    https://www.digital.go.jp/resources/procedures-survey-results
+  Asset:   20250729_procedures-survey-results_outline_02.xlsx
+  Saved:   C:\project\administrative-procedures-mcp\source-data\20250729_procedures-survey-results_outline_02.xlsx (14.0 MB)
+  State:   C:\project\administrative-procedures-mcp\datasets\procedures-survey-r6\.fetch.json
+[convert] Dataset: procedures-survey-r6
+  CSV:     C:\project\administrative-procedures-mcp\source-data\20250729_procedures-survey-results_outline_02.xlsx
+  Headers: 2 row(s)
+  Fields:  38 (of 38 defined)
+  Records: 75071
+  Output:  C:\project\administrative-procedures-mcp\datasets\procedures-survey-r6\data.parquet
+  CSV:     14317 KB → Parquet: 3203 KB
+  Ratio:   77.6% smaller

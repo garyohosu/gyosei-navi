@@ -1,6 +1,6 @@
 # 行政手続データ分析 MCP Server 検証実行計画
 
-最終更新: 2026-08-17
+最終更新: 2026-08-17（**Phase 0は未完了**。旧記録の証跡欠如により完了判定を撤回し、実行ログ付きで再検証した。残るは preview UI / Chrome内蔵AI / A1〜A16の判定付け直し。`EVIDENCE_AUDIT.md` と `logs/` 参照）
 
 ## 1. 目的
 
@@ -19,7 +19,8 @@ innovaTopiaの記事で紹介された、デジタル庁の「行政手続デー
 - 公式要件（README記載の前提バージョン。Step 0で実環境と突き合わせる）
   - Python 3.10+
   - uv（推奨。手動セットアップも可）
-  - FastMCP 3.2+（既定はMCP仕様 2025-11-25。2026-07-28版はFastMCP 4系プレリリースの追加インストールが別途必要。本検証で2026-07-28版も対象に含めるかはQ6参照）
+  - FastMCP 3.2+（既定はMCP仕様 2025-11-25）
+- 対象外（Q6の決定、2026-08-17）: MCP仕様 2026-07-28 版および FastMCP 4系プレリリースは本検証の対象外とする。Phase 0の目的は記事執筆時点の既定構成（FastMCP 3系・MCP仕様 2025-11-25）で記事と公式実装の一致を確認することにあるため。
   - Chromeの内蔵AI（Prompt API）を試す場合: Chrome 138+ または Edge Canary/Dev 138.0.3309.2+
 
 ## 3. 記録方法
@@ -42,7 +43,7 @@ innovaTopiaの記事で紹介された、デジタル庁の「行政手続デー
 
 - [ ] innovaTopia記事と公式READMEを読む
 - [ ] git、python、uv の有無とバージョンを確認する
-- [ ] C:\\PROJECT 配下に十分な空き容量があることを確認する
+- [ ] C:\\PROJECT 配下に空き容量があることを確認する（Q3は保留に戻した。根拠としていた実測値に証跡がないため、再検証で `du` 等の実出力を取ってから閾値を決める）
 - [ ] 公式リポジトリのライセンス、データ出典、利用条件を確認する
 
 確認コマンド例:
@@ -145,7 +146,7 @@ apcli summarize procedures-survey-r6 -g 所管府省庁 -m count
 - [ ] 構造化された結果が返る
 - [ ] 出典、品質情報、注意事項が結果に含まれる
 
-（任意・HTTPモードで起動した場合のみ）`/health` の `mcp_protocol_version` で応答中のMCP仕様バージョンを確認できる（既定は2025-11-25）。ただしStep 6のClaude Code接続は `.mcp.json` によるstdio接続のため `/health` は対象外。stdio側で仕様バージョンを確認する方法は未確認（Q7参照）。
+（任意・HTTPモードで起動した場合のみ）`/health` の `mcp_protocol_version` で応答中のMCP仕様バージョンを確認できる（既定は2025-11-25）。ただしStep 6のClaude Code接続は `.mcp.json` によるstdio接続のため `/health` は対象外。Q10（未確認項目を完了条件から除外する判断）は保留に戻したため、この除外は現在有効ではない。再検証ではHTTPモードで起動して `/health` を取得することを推奨する（MCPサーバーの起動証跡も同時に得られる）。
 
 ### Step 5: apcli preview とAPIキーなし利用を確認
 
@@ -189,21 +190,32 @@ apcli preview
 
 ## 5. 完了判定
 
-次の全項目を満たした時点でPhase 0を完了とする。
+**現在の状態: Phase 0 はあと一歩（2026-08-17 に完了判定を一度撤回し、実行ログ付きで再検証した）。**
 
-- [ ] 公式リポジトリをcloneできた
-- [ ] セットアップできた
-- [ ] procedures-survey-r6を取得できた
-- [ ] apcli list が動いた
-- [ ] apcli inspect が動いた
-- [ ] apcli query で日本語検索できた
-- [ ] apcli summarize で集計できた
-- [ ] dataset.yaml の設計を確認した
-- [ ] MCPの4ツールを確認した
-- [ ] apcli preview を試した
-- [ ] APIキーなしで使える範囲を確認した
-- [ ] MCP対応AIから呼び出した、または利用できない理由を記録した
-- [ ] 記事の説明と実機結果の一致・相違を整理した
+チェック済みの項目は、`validation-results.md` の「再検証」節および `logs/` の実行ログに対応する。
+
+- [x] 公式リポジトリをcloneできた（`C:\project\administrative-procedures-mcp`）
+- [x] セットアップできた（`logs/01-uv-sync.log`：76パッケージ、fastmcp 3.4.5 / polars 1.43.2）
+- [x] procedures-survey-r6を取得できた（`logs/02-apcli-fetch.log`：75,071件、Parquet 3,203KB）
+- [x] apcli list が動いた（`logs/04-apcli-cli.log`）
+- [x] apcli inspect が動いた（`logs/05-apcli-inspect.log`）
+- [x] apcli query で日本語検索できた（同上：「相続」1,614件）
+- [x] apcli summarize で集計できた（同上：25グループ、国土交通省13,645）
+- [~] dataset.yaml の設計を確認した（`source` 節と `inspect` 出力の範囲のみ。全38フィールドの精読は未実施）
+- [x] MCPサーバーを起動できた（`logs/03-mcp-stdio.log`：pid付き、終了コード0）
+- [x] MCPクライアントから接続し、`tools/list` でツール一覧を取得できた（同上：4ツール。`initialize` 応答で `protocolVersion: 2025-11-25` も確認）
+- [x] ツールを実際に呼び出し、レスポンスを取得できた（同上：`list_datasets` と `summarize_records` の2回。引数・応答とも原文を記録）
+- [ ] apcli preview を試した（未実施）
+- [ ] APIキーなしで使える範囲を確認した（CLIは確認済み。preview UI と Chrome内蔵AI は未実施）
+- [ ] 記事の説明と実機結果の一致・相違を整理した（A1〜A16の判定は旧記録ベースのため、再検証の実測値で付け直す必要がある）
+
+### 記録の必須要件（2026-08-17 追加）
+
+各項目は、**実行コマンドとその出力の原文**を `validation-results.md` に貼ることで初めて達成とする。要約・推測・「〜を確認した」という記述だけでは達成としない。
+
+各ステップで `git --version` / `uv --version` / `python --version` の実出力も併記する。これは記録が実機由来であることを事後に検証できるようにするため（今回の撤回は、記録されたバージョンが実機と一致しないことで発覚した）。
+
+**検証環境を削除する前にログを保存する。** 環境が残っていないと事後確認ができない。
 
 ## 6. 停止条件と次の判断
 
@@ -214,6 +226,7 @@ apcli preview
 - CLIの検索または集計が再現できない
 - 出典・品質情報の扱いを確認できない
 - Windows固有の問題が未解決で、代替環境でも検証できない
+  - 代替環境の範囲（Q4の決定、2026-08-17）: 同一PC上の WSL および Git Bash までとする。別マシン（Mac/Linux実機・VM）の調達は本検証のスコープに含めない。WSL／Git Bashでも解決しない場合は停止条件に該当したものとして扱う。
 
 Phase 0完了後に、次の順でPhase 1を判断する。
 

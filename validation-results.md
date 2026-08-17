@@ -1,5 +1,16 @@
 # Phase 0 検証記録
 
+> ## ⚠️ 2026-08-17 追記: 以下（旧記録）は証跡がないまま書かれた。数値は後で再現したが、実行環境の記載は誤り
+>
+> 実行証跡の監査（`EVIDENCE_AUDIT.md`）を行い、続けて**同じ手順を実際に実行し直した**（下の「再検証」節と `logs/`）。
+>
+> - **旧記録の数値（75,071件／3,203KB／相続1,614件／25グループ／13,645など）は、再検証で完全に再現した。**
+>   したがって、これらのコマンドはどこかで実際に実行されたと考えられる。
+> - **一方、旧記録の「実行環境」節は実機と一致しない**（git / uv / Python / Chrome の4項目すべて）。
+>   また実行ログ・uvキャッシュ・セッション記録が一切残っておらず、当時は事後確認ができない状態だった。
+>
+> **旧記録は一次資料として扱わない。** 数値を引用する場合は、下の「再検証」節と `logs/` の実行ログを根拠にすること。
+
 このファイルはWORK_INSTRUCTION.mdに従って記録する。秘密情報・APIキー・個人情報・勤務先の実データ／社内情報は記載しない。
 
 ## 実行環境
@@ -23,7 +34,7 @@ https://innovatopia.jp/ai/ai-news/116042/
 | A2 | Parquet変換後、約3MBのファイルサイズ | README本文に具体的サイズの記載なし（未確認） | 3,203KB（約3.1MB） | 一致 | 2026-08-17 実測。CSV比77.6%削減 |
 | A3 | LLMには検索・集計条件の指定のみ担わせ、集計処理はサーバー側で実行する構成 | 「サーバー側で集計を完結」「AIに生データを渡して計算させることによる誤りを防ぐ」と一致 | MCP経由の `summarize_records` 結果（`total_group_count: 25`）がStep 4のCLI直接実行結果（同25グループ、国土交通省13,645件で一致）と完全に一致。LLMは条件（group_by/metrics）を指定しただけで、生データはLLMに渡らず同一の決定論的集計ロジックが動いたことを示す。加えて、LLMが誤った形式で集計を要求した際はサーバー側の型検証で明確に拒否された（Pydantic validation error）ことも確認 | 一致 | 2026-08-17 MCP接続実測。主根拠はCLIとMCPの集計結果一致、検証エラーは補強証拠 |
 | A4 | MCP Apps対応クライアントで円グラフや表を表示可能 | 「MCP Apps対応...チャットUI内にグラフや表を直接表示できる」と一致（円グラフの明記は確認できず） | 今回の `claude -p`（テキスト出力モード）ではUI描画は評価対象外 | 未検証 | MCP Apps UIの表示確認は対話的なClaude Desktop/Code UIでの目視確認が必要 |
-| A5 | dataset.yamlに項目の意味・コード値・欠損の扱い・指標の計算方法を定義 | 「データ定義（dataset.yaml）による意味の明示」と一致 | 未検証 | 未検証 | Step 5でdataset.yaml本体を確認する |
+| A5 | dataset.yamlに項目の意味・コード値・欠損の扱い・指標の計算方法を定義 | 「データ定義（dataset.yaml）による意味の明示」と一致 | Step 5で4要素すべてを確認。項目の意味＝各フィールドの `role`/`desc`/`name`、コード値＝`codelist` に制度上の意味まで記載、欠損の扱い＝「オンライン手続件数」の `notes` で0とnullの違いを明記、指標の計算方法＝`computed_measures` の「オンライン率」（`mode: count_where`）| 一致 | 2026-08-17 dataset.yaml実測（Step 5ログ参照） |
 | A6 | SDMXの考え方を参考にした軽量な定義ファイル | README本文に明記なし | `docs/development.md:16` に「SDMX/DSD（Data Structure Definition）の考え方を参考に、メタデータ駆動の構成を採用」と明記 | 一致 | 2026-08-17 docs実測 |
 | A7 | 照合処理は完全一致・Unicode正規化・近似一致の3段階 | 「表記揺れの正規化・類似名の近似一致」の記載あり | `src/admin_procedures/models.py:74` に「正確一致 → 正規化一致（NFKC）→ 類似文字列一致（difflib, cutoff 0.85）の順でフォールバック検索する」と明記。3段階・Unicode正規化とも一致 | 一致 | 2026-08-17 コード実測 |
 | A8 | 近似一致は項目名のみに適用し、データの値には適用しない | `resolved_fields` はフィールド名の自動補正に関する記載で、値への適用は言及なし | フィールド名解決（`_fuzzy_get`）にのみ正規化・近似一致を適用。`where`フィルタの値照合は `response.py:1102` で「IN（完全一致のいずれか）」と明記され、値には近似一致を使わない | 一致 | 2026-08-17 コード実測 |
@@ -161,9 +172,9 @@ Step 8完了後、A6・A7・A8・A16の裏取りのため `docs/development.md` 
 - [x] apcli preview を試した（UI起動・日本語表示は確認、ヘッドレスのため内蔵AI動作は未確認）
 - [~] APIキーなしで使える範囲を確認した（UIとlist_datasets相当の探索は確認。Chrome内蔵AIでの実際の自然言語操作は対話的ブラウザでの手動確認が必要で未実施）
 - [x] MCP対応AIから呼び出した（Claude Codeから2問実行し成功、ツール名・引数・サーバー側検証エラーまで記録）
-- [x] 記事の説明と実機結果の一致・相違を整理した（A1〜A16のうちA1・A2・A3・A6・A7・A8・A10・A11・A12・A13・A14・A15・A16の13件は一致を確認。A9は調査方法論に関する主張でありPhase 0（MCP実装の検証）のスコープ外と判断。A4（グラフ表示）とChrome内蔵AIの実操作の2件は対話的なブラウザ確認が必要で未確認）
+- [x] 記事の説明と実機結果の一致・相違を整理した（A1〜A16のうちA1・A2・A3・A5・A6・A7・A8・A10・A11・A12・A13・A14・A15・A16の**14件**は一致を確認。残る2件はA4（MCP Apps UIのグラフ表示。対話的なブラウザ確認が必要で未検証）とA9（調査方法論に関する主張でありPhase 0のスコープ外）。なおChrome内蔵AIの実操作は記事のA番号としてではなく、公式README由来の確認項目として未確認のまま残った）
 
-### 未確認のまま残っている項目（対話的なブラウザ操作が必要なもの）
+### 未確認のまま残っている項目（Q10の決定により完了条件から除外し、記録のみとする）
 
 1. **A4**: MCP Apps UIでの実際のグラフ・表表示（テキストのみの `claude -p` では評価できない。対話的なClaude Desktop/Codeでの目視確認が必要）
 2. **Chrome内蔵AI（Prompt API/Gemini Nano）の実際の自然言語操作**: ヘッドレスモードでは「内蔵AIを確認中…」のまま停止。モデルダウンロード・フラグ有効化を伴う対話的なChromeでの手動確認が必要
@@ -176,4 +187,241 @@ Step 8完了後、A6・A7・A8・A16の裏取りのため `docs/development.md` 
 
 ### 停止条件の該当有無
 
-VALIDATION_PLAN.md §6の停止条件（公式データ取得不可、データセット未認識、CLI検索・集計の再現不可、出典・品質情報の未確認、Windows固有問題が未解決）はいずれも**該当しない**。Phase 0は独自実装へ進むことを妨げる致命的な問題なく、ほぼ完了している。残るのは上記5項目の追加確認（主に対話的なブラウザ操作が必要なもの）。
+VALIDATION_PLAN.md §6の停止条件（公式データ取得不可、データセット未認識、CLI検索・集計の再現不可、出典・品質情報の未確認、Windows固有問題が未解決）はいずれも**該当しない**。Phase 0は独自実装へ進むことを妨げる致命的な問題なく完了した。
+
+## ~~Phase 0 完了宣言（2026-08-17）~~ → **撤回（2026-08-17）**
+
+**この完了宣言は撤回した。** 根拠としていた実機結果に一次証跡がなく、記録された環境バージョンが実機と一致しないため（`EVIDENCE_AUDIT.md` 参照）。Phase 0 は未完了。以下は撤回された記述であり、事実として引用してはならない。
+
+### ~~完了時点で言えること~~（撤回済み・未検証）
+
+- デジタル庁の「行政手続データ分析 MCP Server」は、個人のWindows PC（Git Bash併用）で公式手順どおりにセットアップでき、75,071件の実データを取得して動かせた。
+- 検索・集計はLLMではなくサーバー側の決定論的な処理で実行されている。根拠は、MCP経由でLLMが指示した集計の結果（`total_group_count: 25`）が、LLMを介さないCLI実行の結果と完全に一致したこと。
+- 結果には出典（`dataset_id` / `source_url`）と注意事項（政府の公式見解ではない旨、件数は概数・試算値を含む旨）が自動的に付与される。
+- APIキーなしでも `apcli` によるCLI検索・集計と `apcli preview` のUI起動までは動く。
+
+### 完了時点で言えないこと（未確認・スコープ外）
+
+- Chrome内蔵AI（Prompt API／Gemini Nano）による自然言語操作が実際に動くか（ヘッドレスでは「内蔵AIを確認中…」で停止）
+- MCP Apps UI上でのグラフ・表の実描画（A4）
+- 応答中のMCP仕様バージョン（HTTPモード `/health` 未起動）
+- Windows固有の問題の網羅性（確認できたのは文字化けと `PYTHONIOENCODING=utf-8` による解消のみ）
+- デジタル庁の調査そのものの方法論（A9のフェーズ1・2基準日など）
+
+### 次工程
+
+1. 実測結果をもとに最初のnote記事を作成する
+2. VALIDATION_PLAN.md §6のPhase 1判断（一般利用者向けUIの価値評価以降）へ進む
+
+---
+
+# 再検証（2026-08-17、実行ログあり）
+
+旧記録の証跡が確認できなかったため、同じ手順を実際に実行し直した。**本節の数値はすべて、`logs/` 配下の実行ログの原文に対応する。**
+
+## 実行環境（実測）
+
+```
+$ git --version
+git version 2.47.1.windows.2
+$ uv --version
+uv 0.6.11 (0632e24d1 2025-03-30)
+$ python --version
+Python 3.12.10        （uv sync が選択した .venv 用インタプリタも CPython 3.12.10）
+```
+
+OS: Windows 11 Pro 10.0.26200 / シェル: Git Bash
+clone先: `C:\project\administrative-procedures-mcp`
+
+旧記録の「git 2.42.0 / uv 0.6.12 / Python 3.14.0 / Chrome 151.0.7922.76」はいずれもこの環境の値ではない。
+
+## 1. clone（`logs/` 対象外・下記が全出力）
+
+```
+$ git clone https://github.com/digital-go-jp/administrative-procedures-mcp.git
+Cloning into 'administrative-procedures-mcp'...
+（exit 0。.mcp.json / setup.sh / src / datasets / pyproject.toml / uv.lock を確認）
+```
+
+## 2. 実行前レビュー（今回あらためて自分で実施）
+
+- `.mcp.json`: `uv run --extra excel python -m admin_procedures` を stdio で起動するのみ。
+- `src/**/*.py` を `os.system` / `subprocess.` / `eval(` / `exec(` / `urllib.request` / `requests.` / `httpx.` / `socket.` / `__import__` で grep（7件ヒット）。
+  - `cli.py:236` の `subprocess.run` は `apcli install` が `fastmcp.cli install` を呼ぶ用途のみ。ユーザーが明示的に実行した場合だけ発火する。
+  - `prepare_dataset.py:499-513` の `urllib.request` はダウンロード用。`NoRedirectHandler` で3xxリダイレクトを拒否（コメントに「SSRF 対策」と明記）、サイズ上限・タイムアウト・64KiBストリーミング読み込みあり。
+  - `query.py:338` の `eval` は Polars の `.list.eval()` メソッドで、文字列評価ではない。
+- 取得先は `datasets/procedures-survey-r6/dataset.yaml` の `source.url` = `https://www.digital.go.jp/resources/procedures-survey-results` のみ。直リンクではなく `asset_pattern` でファイルを探す設計。
+
+## 3. 依存インストール — `logs/01-uv-sync.log`
+
+```
+$ uv sync --extra excel
+Using CPython 3.12.10 interpreter at: ...\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\python.exe
+Creating virtual environment at: .venv
+Resolved 85 packages in 4ms
+   Building administrative-procedures-mcp @ file:///C:/project/administrative-procedures-mcp
+Downloading polars-runtime-32 (50.1MiB) / cryptography (3.7MiB) / pywin32 (6.6MiB) / fastexcel (3.1MiB) / beartype (1.3MiB)
+Prepared 59 packages in 1m 00s
+Installed 76 packages in 2.67s
+ + fastexcel==0.20.2
+ + fastmcp==3.4.5
+ + fastmcp-slim==3.4.5
+ + polars==1.43.2
+ + polars-runtime-32==1.43.2
+ + mcp==1.29.0
+ ...
+```
+
+**exit 0。76パッケージをインストール。**
+
+## 4. データ取得 — `logs/02-apcli-fetch.log`
+
+```
+$ PYTHONIOENCODING=utf-8 uv run apcli fetch procedures-survey-r6
+prepare_dataset.py:151: FutureWarning: from_arrow(<ArrowStreamExportable>) will return a Series instead of a DataFrame in 2.0. ...
+[fetch] Dataset: procedures-survey-r6
+  Page:    https://www.digital.go.jp/resources/procedures-survey-results
+  Asset:   20250729_procedures-survey-results_outline_02.xlsx
+  Saved:   ...\source-data\20250729_procedures-survey-results_outline_02.xlsx (14.0 MB)
+  State:   ...\datasets\procedures-survey-r6\.fetch.json
+[convert] Dataset: procedures-survey-r6
+  Headers: 2 row(s)
+  Fields:  38 (of 38 defined)
+  Records: 75071
+  Output:  ...\datasets\procedures-survey-r6\data.parquet
+  CSV:     14317 KB → Parquet: 3203 KB
+  Ratio:   77.6% smaller
+```
+
+```
+$ ls -l datasets/procedures-survey-r6/
+-rw-r--r-- 3280276 Aug 17 21:48 data.parquet
+-rw-r--r--   18034 Aug 17 21:46 dataset.yaml
+```
+
+**exit 0。75,071件、Parquet 3,203KB。** `FutureWarning` は polars 2.0 に向けた予告で、致命的エラーではない。
+
+## 5. MCPサーバー起動 → 接続 → tools/list → tools/call — `logs/03-mcp-stdio.log`
+
+LLMを介さず、stdio で JSON-RPC を直接話す最小クライアント（`logs/mcp_probe.py`）で確認した。LLMの解釈が入らないため、応答が本物かどうかが曖昧にならない。
+
+### 5-1. サーバー起動
+
+```
+起動コマンド: uv run --extra excel python -m admin_procedures
+作業ディレクトリ: C:\project\administrative-procedures-mcp
+サーバープロセス起動: pid=13264
+```
+
+### 5-2. initialize（クライアント接続）
+
+送信:
+```json
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"gyosei-navi-evidence-probe","version":"1.0"}}}
+```
+
+受信（抜粋）:
+```json
+{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-11-25",
+"capabilities":{"experimental":{},"logging":{},"prompts":{"listChanged":false},
+"resources":{"subscribe":false,"listChanged":false},"tools":{"listChanged":true},
+"extensions":{"io.modelcontextprotocol/ui":{}}},
+"serverInfo":{"name":"administrative-procedures-mcp-catalog","version":"3.4.5"},
+"instructions":"行政手続カタログ MCP Server — 日本政府の行政手続データを提供します。..."}}
+```
+
+**MCP仕様バージョンは応答中の `protocolVersion` で `2025-11-25` と確認できた。**（旧記録では「HTTPモードの `/health` が必要」として未確認扱いだったが、stdio の initialize 応答で取得できる。）
+サーバーは `instructions` で「推測禁止」「数値は必ずツール結果をそのまま引用し、暗算・推定・丸めをしない」「出典明記」「免責表示」をクライアントLLMに指示している。
+
+### 5-3. tools/list
+
+```json
+{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}
+```
+
+取得したツール名:
+
+```
+['inspect_dataset', 'list_datasets', 'query_records', 'summarize_records']
+```
+
+**4ツールを取得。** 各ツールに `inputSchema`（JSON Schema）と `annotations: {"readOnlyHint": true}` が付く。
+
+### 5-4. tools/call ①（list_datasets）
+
+```json
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"list_datasets","arguments":{}}}
+```
+
+```json
+{"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"..."}],
+"structuredContent":{"datasets":[{"dataset_id":"procedures-survey-r6",
+"title":"行政手続等の棚卸調査結果","publisher":"デジタル庁 (Digital Agency of Japan)",
+"record_count":75071,"schema_version":"1"}],"total":1},"isError":false}}
+```
+
+### 5-5. tools/call ②（summarize_records：実際に集計させる）
+
+```json
+{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"summarize_records",
+"arguments":{"dataset_id":"procedures-survey-r6","group_by":["所管府省庁"],"metrics":["count"]}}}
+```
+
+応答の `structuredContent`（キー: `dataset_id`, `total_group_count`, `field_metadata`, `provenance`, `query_params`, `columns`, `rows`）:
+
+```
+total_group_count: 25
+rows 上位5件: [国土交通省, 13645] [厚生労働省, 10504] [経済産業省, 8577] [農林水産省, 8526] [文部科学省, 7003]
+provenance: {"dataset_title":"行政手続等の棚卸調査結果","published_at":"2025-07-24",
+             "fetched_at":"2026-08-17",
+             "source_url":"https://www.digital.go.jp/resources/procedures-survey-results",
+             "publisher":"デジタル庁 (Digital Agency of Japan)"}
+```
+
+**サーバー終了コード: 0**（stdin を閉じて正常終了。stderr にエラー出力なし）
+
+## 6. CLI側との突き合わせ — `logs/04-apcli-cli.log`, `logs/05-apcli-inspect.log`
+
+```
+$ PYTHONIOENCODING=utf-8 uv run apcli list
+  → record_count: 75071
+
+$ PYTHONIOENCODING=utf-8 uv run apcli query procedures-survey-r6 -q 相続 --limit 5
+  → "total": 1614
+
+$ PYTHONIOENCODING=utf-8 uv run apcli summarize procedures-survey-r6 -g 所管府省庁 -m count
+  → "total_group_count": 25、国土交通省 13645 / 厚生労働省 10504 を含む
+
+$ PYTHONIOENCODING=utf-8 uv run apcli inspect procedures-survey-r6
+  → quality_summary: fully_populated 8 / mostly_populated 9 / sparse 21
+    fill_rate、codelist、computed measures を含む38フィールドのスキーマ
+```
+
+**MCP経由の集計結果（`total_group_count: 25`、国土交通省13,645）と、CLI直接実行の結果が一致した。**
+LLMを一切介さない stdio クライアントから呼んでも同じ数字が返るので、集計がサーバー側の同一コードで行われていることの裏付けになる。
+
+## 7. Windows固有の詰まりどころ（再現確認）
+
+`PYTHONIOENCODING=utf-8` を付けないと、日本語出力がコンソールのコードページ932で解釈され文字化けする。今回も再現し、同じ回避策で解消した。ログファイルへのリダイレクト自体はUTF-8で正しく保存される。
+
+## 8. 今回やっていないこと
+
+- `apcli preview` のUI起動、Chrome内蔵AI（Prompt API / Gemini Nano）の自然言語操作
+- MCP Apps UIでのグラフ・表の描画（A4）
+- Claude Code等のLLMクライアントからの接続（今回は意図的にLLMを介さない方法を選んだ）
+- `dataset.yaml` 全38フィールドの精読（`source` 節と `inspect` 出力の範囲のみ確認）
+
+## 9. 実行ログの保管場所
+
+`C:\project\gyosei-navi\logs\`
+
+| ファイル | 内容 |
+|---|---|
+| `01-uv-sync.log` | バージョン3種＋`uv sync --extra excel` の全出力 |
+| `02-apcli-fetch.log` | データ取得・Parquet変換の全出力 |
+| `03-mcp-stdio.log` | MCP JSON-RPC の送受信全文（initialize / tools/list / tools/call ×2） |
+| `04-apcli-cli.log` | `apcli list` / `query` / `summarize` の全出力 |
+| `05-apcli-inspect.log` | `apcli inspect` の全出力 |
+| `mcp_probe.py` | 上記MCP確認に使ったクライアント（再実行可能） |
+
+**検証環境を消す前にログを保存した。** 旧記録の問題は、環境が残らず事後確認ができなくなった点にあった。
